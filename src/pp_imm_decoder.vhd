@@ -5,16 +5,24 @@
 library ieee;
 use ieee.std_logic_1164.all;
 
---! @brief Module decoding immediate values from instruction words.
+--! @addtogroup CORE
+--! @{
+
+--! @brief   Module decoding immediate values from instruction words.
+--! @details The RISC-V specification @cite riscv specifies several different instruction formats which contain
+--!          immediate values as operands. This module identifies which format belongs to the instruction being
+--!          decoded and produces an output word with the correct immediate value.
 entity pp_imm_decoder is
 	port(
-		instruction : in  std_logic_vector(31 downto 2);
-		immediate   : out std_logic_vector(31 downto 0)
+		instruction : in  std_logic_vector(31 downto 2); --! Instruction word
+		immediate   : out std_logic_vector(31 downto 0)  --! Decoded immediate value
 	);
 end entity pp_imm_decoder;
 
+--! @brief Behavioural architecture of the immediate value decoder.
 architecture behaviour of pp_imm_decoder is
 begin
+	--! @brief Decodes and reassembles the immediate value contained in a instruction.
 	decode: process(instruction)
 	begin
 		case instruction(6 downto 2) is
@@ -33,3 +41,5 @@ begin
 		end case;
 	end process decode;
 end architecture behaviour;
+
+--! @}
