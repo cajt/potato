@@ -8,24 +8,30 @@ use ieee.numeric_std.all;
 
 use work.pp_csr.all;
 
+--! @addtogroup CSR
+--! @{
+
 --! @brief ALU used for calculating new values of control and status registers.
 entity pp_csr_alu is
 	port(
-		x, y          : in  std_logic_vector(31 downto 0);
-		result        : out std_logic_vector(31 downto 0);
-		immediate     : in  std_logic_vector(4 downto 0);
-		use_immediate : in  std_logic;
-		write_mode    : in  csr_write_mode
+		result        : out std_logic_vector(31 downto 0);	--! Output result.
+		x, y          : in  std_logic_vector(31 downto 0);	--! Register input operand.
+		immediate     : in  std_logic_vector(4 downto 0);	--! Immediate value operand.
+		use_immediate : in  std_logic;				--! Whether to use the immediate value or the @c y input as operand.
+		write_mode    : in  csr_write_mode			--! Register write mode, determines the ALU operation.
 	);
 end entity pp_csr_alu;
 
+--! @brief Behavioural architecture of the CSR ALU.
 architecture behaviour of pp_csr_alu is
-	signal a, b : std_logic_vector(31 downto 0);
+	signal a : std_logic_vector(31 downto 0); --! First operand
+	signal b : std_logic_vector(31 downto 0); --! Second operand
 begin
 
 	a <= x;
 	b <= y when use_immediate = '0' else std_logic_vector(resize(unsigned(immediate), b'length));
 
+	--! Calculates the new value of a control/status register.
 	calculate: process(a, b, write_mode)
 	begin
 		case write_mode is
@@ -41,3 +47,5 @@ begin
 	end process calculate;
 
 end architecture behaviour;
+
+--! @}
