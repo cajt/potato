@@ -8,9 +8,7 @@ use ieee.numeric_std.all;
 
 use work.pp_csr.all;
 
---! @addtogroup CSR
---! @{
-
+--! @ingroup CSR
 --! @brief ALU used for calculating new values of control and status registers.
 entity pp_csr_alu is
 	port(
@@ -48,4 +46,3 @@ begin
 
 end architecture behaviour;
 
---! @}
