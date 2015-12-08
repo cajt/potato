@@ -9,79 +9,87 @@ use ieee.numeric_std.all;
 use work.pp_csr.all;
 use work.pp_utilities.all;
 
+--! @ingroup CSR
+--! @brief Control and System Register Unit.
+--! @details This module handles reads and writes of control and status registers. This includes handling the
+--!          @c FROMHOST and @c TOHOST registers, which is used when testing and verifying the processor, as
+--!          well as storing the necessary exception context when an exception is taken.
 entity pp_csr_unit is
 	generic(
-		PROCESSOR_ID : std_logic_vector(31 downto 0)
+		PROCESSOR_ID : std_logic_vector(31 downto 0) --! ID of the processor.
 	);
 	port(
-		clk, timer_clk : in std_logic;
-		reset : in std_logic;
+		clk       : in std_logic; --! Clock signal
+		timer_clk : in std_logic; --! System timer clock signal
+		reset     : in std_logic; --! Reset signal
 
 		-- IRQ signals:
-		irq : in std_logic_vector(7 downto 0);
+		irq : in std_logic_vector(7 downto 0); --! Active IRQs.
 
 		-- Count retired instruction:
-		count_instruction : in std_logic;
+		count_instruction : in std_logic; --! Whether to increase the retired instruction counter.
 
 		-- HTIF interface:
-		fromhost_data    : in  std_logic_vector(31 downto 0);
-		fromhost_updated : in  std_logic;
-		tohost_data      : out std_logic_vector(31 downto 0);
-		tohost_updated   : out std_logic;
+		fromhost_data    : in  std_logic_vector(31 downto 0); --! Data from the host
+		fromhost_updated : in  std_logic;                     --! Data from the host was updated
+		tohost_data      : out std_logic_vector(31 downto 0); --! Data to the host
+		tohost_updated   : out std_logic;                     --! Data to the host was updated
 
 		-- Read port:
-		read_address   : in csr_address;
-		read_data_out  : out std_logic_vector(31 downto 0);
-		read_writeable : out boolean;
+		read_address   : in csr_address;                    --! Address of the CSR to read.
+		read_data_out  : out std_logic_vector(31 downto 0); --! Data of the CSR that was read.
+		read_writeable : out boolean;                       --! Whether the read CSR is readable.
 
 		-- Write port:
-		write_address : in csr_address;
-		write_data_in : in std_logic_vector(31 downto 0);
-		write_mode    : in csr_write_mode;
+		write_address : in csr_address;                   --! Address of the CSR to write.
+		write_data_in : in std_logic_vector(31 downto 0); --! Data to write to the CSR. 
+		write_mode    : in csr_write_mode;                --! Write mode for CSR writes.
 
 		-- Exception context write port:
-		exception_context       : in csr_exception_context;
-		exception_context_write : in std_logic;
+		exception_context       : in csr_exception_context; --! Context for the active exception.
+		exception_context_write : in std_logic;             --! Whether to store the exception context.
 
 		-- Interrupts originating from this unit:
-		software_interrupt_out : out std_logic;
-		timer_interrupt_out    : out std_logic;
+		software_interrupt_out : out std_logic; --! Software interrupt active.
+		timer_interrupt_out    : out std_logic; --! System timer interrupt active.
 
 		-- Registers needed for exception handling, always read:
-		mie_out         : out std_logic_vector(31 downto 0);
-		mtvec_out       : out std_logic_vector(31 downto 0);
-		ie_out, ie1_out : out std_logic
+		mie_out   : out std_logic_vector(31 downto 0); --! Value of the MIE register.
+		mtvec_out : out std_logic_vector(31 downto 0); --! Value of the MTVEC register.
+		ie_out    : out std_logic;                     --! Value of the IE status bit.
+		ie1_out   : out std_logic                      --! Value of the IE1 status bit.
 	);
 end entity pp_csr_unit;
 
+--! @brief Behavioural architecture of the CSR unit.
 architecture behaviour of pp_csr_unit is
 
 	-- Counters:
-	signal counter_time    : std_logic_vector(63 downto 0);
-	signal counter_cycle   : std_logic_vector(63 downto 0);
-	signal counter_instret : std_logic_vector(63 downto 0);
+	signal counter_time    : std_logic_vector(63 downto 0); --! Counter value for the time counter
+	signal counter_cycle   : std_logic_vector(63 downto 0); --! Counter value for the cycle counter
+	signal counter_instret : std_logic_vector(63 downto 0); --! Counter value for the instruction counter
 
 	-- Machine time counter:
-	signal counter_mtime : std_logic_vector(31 downto 0);
-	signal mtime_compare : std_logic_vector(31 downto 0);
+	signal counter_mtime : std_logic_vector(31 downto 0); --! Counter for the machine-mode timer
+	signal mtime_compare : std_logic_vector(31 downto 0); --! Compare register for the machine-mode timer.
 
 	-- Machine-mode registers:
-	signal mcause   : csr_exception_cause;
-	signal mbadaddr : std_logic_vector(31 downto 0);
-	signal mscratch : std_logic_vector(31 downto 0);
-	signal mepc     : std_logic_vector(31 downto 0);
-	signal mtvec    : std_logic_vector(31 downto 0) := x"00000100";
-	signal mie      : std_logic_vector(31 downto 0) := (others => '0');
+	signal mcause   : csr_exception_cause;           --! Exception cause register
+	signal mbadaddr : std_logic_vector(31 downto 0); --! Bad address register
+	signal mscratch : std_logic_vector(31 downto 0); --! Scratchpad register
+	signal mepc     : std_logic_vector(31 downto 0); --! Exception PC value
+	signal mtvec    : std_logic_vector(31 downto 0) := x"00000100";     --! Exception vector base address
+	signal mie      : std_logic_vector(31 downto 0) := (others => '0'); --! Enabled interrupts register
 
 	-- Interrupt enable bits:
-	signal ie, ie1    : std_logic;
+	signal ie, ie1    : std_logic; --! Interrupt enable bit
 
 	-- HTIF FROMHOST register:
-	signal fromhost: std_logic_vector(31 downto 0);
+	signal fromhost: std_logic_vector(31 downto 0); --! Last received data from the host.
 
 	-- Interrupt signals:
-	signal timer_interrupt    : std_logic;
-	signal software_interrupt : std_logic;
+	signal timer_interrupt    : std_logic; --! Machine-mode timer interrupt bit
+	signal software_interrupt : std_logic; --! Software interrupt bit
 
 begin
 
@@ -123,6 +131,7 @@ begin
 		end if;
 	end process htif_tohost;
 
+	--! Updates the counter for the machine-mode timer.
 	mtime_counter: process(timer_clk, reset)
 	begin
 		if reset = '1' then -- Asynchronous reset because timer_clk is slower than clk
@@ -132,6 +141,7 @@ begin
 		end if;
 	end process mtime_counter;
 
+	--! Checks for and controls the machine-mode timer interrupt.
 	mtime_interrupt: process(clk)
 	begin
 		if rising_edge(clk) then
@@ -147,6 +157,7 @@ begin
 		end if;
 	end process mtime_interrupt;
 
+	--! Handles writes to control and status registers.
 	write: process(clk)
 	begin
 		if rising_edge(clk) then
@@ -192,6 +203,7 @@ begin
 		end if;
 	end process write;
 
+	--! Handles reads from control and status registers.
 	read: process(clk)
 	begin
 		if rising_edge(clk) then
@@ -213,9 +225,7 @@ begin
 								8 => '1', -- Set the bit corresponding to I
 								others => '0');
 					when CSR_MIMPID => -- Implementation/Implementor ID
-						read_data_out <= (31 downto 16 => '0') & x"8000";
-						-- The anonymous source ID, 0x8000 is used until an open-source implementation ID
-						-- is available for use.
+						read_data_out <= (31 downto 16 => '0') & x"8000"; -- "Anonymous source" ID
 					when CSR_MHARTID => -- Hardware thread ID
 						read_data_out <= PROCESSOR_ID;
 					when CSR_MFROMHOST => -- Data from a host environment
@@ -267,6 +277,7 @@ begin
 		end if;
 	end process read;
 
+	--! Counter for the @c TIME and @c TIMEH registers.
 	timer_counter: entity work.pp_counter
 		port map(
 			clk => timer_clk,
@@ -275,6 +286,7 @@ begin
 			increment => '1'
 		);
 
+	--! Counter for the @c CYCLE and @c CYCLEH registers.
 	cycle_counter: entity work.pp_counter
 		port map(
 			clk => clk,
@@ -283,6 +295,7 @@ begin
 			increment => '1'
 		);
 
+	--! Counter for the @c INSTRET and @c INSTRETH registers.
 	instret_counter: entity work.pp_counter
 		port map(
 			clk => clk,
@@ -292,3 +305,4 @@ begin
 		);
 
 end architecture behaviour;
+
