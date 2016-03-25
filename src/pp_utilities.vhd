@@ -4,6 +4,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use IEEE.NUMERIC_STD.ALL;
 
 use work.pp_types.all;
 use work.pp_constants.all;
@@ -40,14 +41,10 @@ package body pp_utilities is
 	function is_pow2(input : in natural) return boolean is
 		variable c : natural := 1;
 	begin
-		for i in 0 to 30 loop -- FIXME: Simulator complains about 2^31 being out of range!
-			if input = i then
-				return true;
-			end if;
-
-			c := c * 2;
-		end loop;
-
+		if (std_logic_vector(to_unsigned(input, 32)) 
+		    and std_logic_vector(to_unsigned((input-1), 32))) = x"00000000" then
+			return true;
+		end if;
 		return false;
 	end function is_pow2;
 

@@ -51,6 +51,8 @@ begin
 				output <= b"0000110";
 			when x"f" =>
 				output <= b"0001110";
+			when others =>
+				output <= b"1111111"; -- fixes XST bug
 		end case;
 	end process decoder;
 

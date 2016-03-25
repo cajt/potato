@@ -64,7 +64,7 @@ architecture behaviour of toplevel is
 	signal dmem_ack_out : std_logic;
 
 	-- GPIO module I (switches) wishbone interface:
-	signal gpio1_adr_in  : std_logic_vector( 1 downto 0);
+	signal gpio1_adr_in  : std_logic_vector(11 downto 0);
 	signal gpio1_dat_in  : std_logic_vector(31 downto 0);
 	signal gpio1_dat_out : std_logic_vector(31 downto 0);
 	signal gpio1_we_in   : std_logic;
@@ -72,7 +72,7 @@ architecture behaviour of toplevel is
 	signal gpio1_ack_out : std_logic;
 
 	-- GPIO module II (LEDs) wishbone interface:
-	signal gpio2_adr_in  : std_logic_vector( 1 downto 0);
+	signal gpio2_adr_in  : std_logic_vector(11 downto 0);
 	signal gpio2_dat_in  : std_logic_vector(31 downto 0);
 	signal gpio2_dat_out : std_logic_vector(31 downto 0);
 	signal gpio2_we_in   : std_logic;
@@ -80,7 +80,7 @@ architecture behaviour of toplevel is
 	signal gpio2_ack_out : std_logic;
 
 	-- UART module wishbone interface:
-	signal uart_adr_in  : std_logic_vector(1 downto 0);
+	signal uart_adr_in  : std_logic_vector(11 downto 0);
 	signal uart_dat_in  : std_logic_vector(7 downto 0);
 	signal uart_dat_out : std_logic_vector(7 downto 0);
 	signal uart_we_in   : std_logic;
@@ -88,7 +88,7 @@ architecture behaviour of toplevel is
 	signal uart_ack_out : std_logic;
 
 	-- Timer module wishbone interface:
-	signal timer_adr_in  : std_logic_vector( 1 downto 0);
+	signal timer_adr_in  : std_logic_vector(11 downto 0);
 	signal timer_dat_in  : std_logic_vector(31 downto 0);
 	signal timer_dat_out : std_logic_vector(31 downto 0);
 	signal timer_we_in   : std_logic;
@@ -225,9 +225,7 @@ begin
 
 	uart1: entity work.pp_soc_uart
 		generic map(
-			FIFO_DEPTH => 64,
-			SAMPLE_CLK_DIVISOR => 27 -- For 50 MHz
-			--SAMPLE_CLK_DIVISOR => 33 -- For 60 MHz
+			FIFO_DEPTH => 64
 		) port map(
 			clk => system_clk,
 			reset => reset,
@@ -307,10 +305,10 @@ begin
 
 	imem_adr_in <= p_adr_out(12 downto 0);
 	dmem_adr_in <= p_adr_out(12 downto 0);
-	gpio1_adr_in <= p_adr_out(3 downto 2);
-	gpio2_adr_in <= p_adr_out(3 downto 2);
-	uart_adr_in <=  p_adr_out(3 downto 2);
-	timer_adr_in <= p_adr_out(3 downto 2);
+	gpio1_adr_in <= p_adr_out(11 downto 0);
+	gpio2_adr_in <= p_adr_out(11 downto 0);
+	uart_adr_in <=  p_adr_out(11 downto 0);
+	timer_adr_in <= p_adr_out(11 downto 0);
 	seg7_adr_in <=  p_adr_out(2 downto 2);
 
 	dmem_dat_in <= p_dat_out;
